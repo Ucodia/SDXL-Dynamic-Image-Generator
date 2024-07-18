@@ -10,13 +10,17 @@ class ImageGeneratorApp:
     def __init__(self, window, window_title):
         self.window = window
         self.window.title(window_title)
-        self.window.geometry('1200x1350')  # Adjusted window size to accommodate larger canvas and controls
+        self.window.geometry('600x800')  # Adjusted window size to accommodate larger canvas and controls
 
-        self.output_canvas = tk.Canvas(window, width=1024, height=1024)
-        self.output_canvas.grid(row=0, column=0, padx=10, pady=2)
+        # Create a main frame to hold all content
+        self.main_frame = ttk.Frame(self.window)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.controls_frame = ttk.Frame(window)
-        self.controls_frame.grid(row=1, column=0, pady=2, sticky="ew")
+        self.output_canvas = tk.Canvas(self.main_frame, width=512, height=512, bg='lightgray')
+        self.output_canvas.pack(pady=10)
+
+        self.controls_frame = ttk.Frame(self.main_frame)
+        self.controls_frame.pack(fill=tk.X, padx=10, pady=10)
 
         self.setup_ui()
 
@@ -37,33 +41,36 @@ class ImageGeneratorApp:
         default_prompt = "A photograph of a water drop"
 
         # Text input prompt
-        self.text_input_label = tk.Label(self.controls_frame, text="Prompt:", font=font_size)
-        self.text_input_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        self.text_input_label = ttk.Label(self.controls_frame, text="Prompt:", font=font_size)
+        self.text_input_label.pack(anchor='w')
 
-        self.text_input = tk.Text(self.controls_frame, width=40, height=2, font=font_size, wrap=tk.WORD)
-        self.text_input.insert(tk.END, default_prompt)  # Set default prompt
-        self.text_input.grid(row=0, column=1, padx=10, pady=10, columnspan=4, sticky="ew")
+        self.text_input = tk.Text(self.controls_frame, width=60, height=2, font=font_size, wrap=tk.WORD)
+        self.text_input.insert(tk.END, default_prompt)
+        self.text_input.pack(fill=tk.X, pady=5)
+
+        # Frame for sliders
+        sliders_frame = ttk.Frame(self.controls_frame)
+        sliders_frame.pack(fill=tk.X, pady=10)
 
         # Adjusted slider ranges and defaults
-        self.strength_slider = tk.Scale(self.controls_frame, from_=0.0, to=1.0, resolution=0.1, orient=tk.HORIZONTAL, label="Strength", length=200)
+        self.strength_slider = tk.Scale(sliders_frame, from_=0.0, to=1.0, resolution=0.1, orient=tk.HORIZONTAL, label="Strength", length=150)
         self.strength_slider.set(1.0)  # Set default
-        self.strength_slider.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+        self.strength_slider.pack(side=tk.LEFT, padx=5)
 
-        self.guidance_scale_slider = tk.Scale(self.controls_frame, from_=0.0, to=1.0, resolution=0.1, orient=tk.HORIZONTAL, label="Guidance Scale", length=200)
+        self.guidance_scale_slider = tk.Scale(sliders_frame, from_=0.0, to=1.0, resolution=0.1, orient=tk.HORIZONTAL, label="Guidance Scale", length=150)
         self.guidance_scale_slider.set(1.0)  # Set default
-        self.guidance_scale_slider.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        self.guidance_scale_slider.pack(side=tk.LEFT, padx=5)
 
-        self.num_steps_slider = tk.Scale(self.controls_frame, from_=1, to=50, resolution=1, orient=tk.HORIZONTAL, label="Num Inference Steps", length=200)
+        self.num_steps_slider = tk.Scale(sliders_frame, from_=1, to=50, resolution=1, orient=tk.HORIZONTAL, label="Num Inference Steps", length=150)
         self.num_steps_slider.set(2)  # Set default
-        self.num_steps_slider.grid(row=1, column=2, padx=5, pady=5, sticky="ew")
+        self.num_steps_slider.pack(side=tk.LEFT, padx=5)
 
-        # New seed slider
-        self.seed_slider = tk.Scale(self.controls_frame, from_=0, to=10000, resolution=1, orient=tk.HORIZONTAL, label="Seed", length=200)
+        self.seed_slider = tk.Scale(sliders_frame, from_=0, to=10000, resolution=1, orient=tk.HORIZONTAL, label="Seed", length=150)
         self.seed_slider.set(1)  # Set default to 1
-        self.seed_slider.grid(row=1, column=3, padx=5, pady=5, sticky="ew")
+        self.seed_slider.pack(side=tk.LEFT, padx=5)
 
         self.btn_toggle_record = ttk.Button(self.controls_frame, text="Toggle Generation", command=self.toggle_recording, width=20, style='W.TButton')
-        self.btn_toggle_record.grid(row=2, column=0, padx=10, pady=10, columnspan=4)
+        self.btn_toggle_record.pack(pady=10)
 
     def load_model(self):
         self.pipe = AutoPipelineForImage2Image.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16")
@@ -136,7 +143,7 @@ class ImageGeneratorApp:
         return Image.fromarray(blended_array)
 
     def display_transformed_image(self, transformed_image):
-        photo = ImageTk.PhotoImage(transformed_image.resize((1024, 1024), Image.LANCZOS))
+        photo = ImageTk.PhotoImage(transformed_image)
         self.output_canvas.create_image(0, 0, image=photo, anchor=tk.NW)
         self.output_canvas.image = photo  # Keep a reference!
 
