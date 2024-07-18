@@ -73,8 +73,13 @@ class ImageGeneratorApp:
         self.btn_toggle_record.pack(pady=10)
 
     def load_model(self):
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+
         self.pipe = AutoPipelineForImage2Image.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16")
-        self.pipe.to("cuda")
+        self.pipe.to(device)
 
     def toggle_recording(self):
         # Toggles between recording and not recording states
