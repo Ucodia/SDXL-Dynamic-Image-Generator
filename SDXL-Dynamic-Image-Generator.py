@@ -12,7 +12,7 @@ class ImageGeneratorApp:
     def __init__(self, window, window_title):
         self.window = window
         self.window.title(window_title)
-        self.window.geometry('600x800')
+        self.window.geometry('600x850')  # Slightly increased height to accommodate new field
 
         self.main_frame = ttk.Frame(self.window)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -73,6 +73,14 @@ class ImageGeneratorApp:
         self.seed_slider.set(1)  # Set default to 1
         self.seed_slider.pack(side=tk.LEFT, padx=5)
 
+        # New negative prompt input
+        self.negative_prompt_label = ttk.Label(self.controls_frame, text="Negative Prompt:", font=font_size)
+        self.negative_prompt_label.pack(anchor='w', pady=(10, 0))
+
+        self.negative_prompt_input = tk.Text(self.controls_frame, width=60, height=1, font=font_size, wrap=tk.WORD)
+        self.negative_prompt_input.insert(tk.END, "nsfw, naked")  # Default negative prompt
+        self.negative_prompt_input.pack(fill=tk.X, pady=5)
+
         self.btn_toggle_record = ttk.Button(self.controls_frame, text="Toggle Generation", command=self.toggle_recording, width=20, style='W.TButton')
         self.btn_toggle_record.pack(pady=10)
 
@@ -101,6 +109,7 @@ class ImageGeneratorApp:
 
     def process_frame(self):
         prompt = self.text_input.get("1.0", tk.END).strip()
+        negative_prompt = self.negative_prompt_input.get("1.0", tk.END).strip()
         seed = self.seed_slider.get()
 
         if prompt:
@@ -109,6 +118,7 @@ class ImageGeneratorApp:
             if self.previous_frame is None:
                 init_image = Image.new('RGB', (512, 512), color='white')
                 transformed_image = self.pipe(prompt=prompt,
+                                              negative_prompt=negative_prompt,
                                               image=init_image,
                                               strength=self.strength_slider.get(),
                                               guidance_scale=self.guidance_scale_slider.get(),
@@ -117,6 +127,7 @@ class ImageGeneratorApp:
             else:
                 perturbed_image = self.apply_random_perturbations(self.previous_frame)
                 transformed_image = self.pipe(prompt=prompt,
+                                              negative_prompt=negative_prompt,
                                               image=perturbed_image,
                                               strength=self.strength_slider.get(),
                                               guidance_scale=self.guidance_scale_slider.get(),
@@ -169,7 +180,7 @@ class ImageGeneratorApp:
 
 def main():
     root = tk.Tk()
-    app = ImageGeneratorApp(root, "Image Generator App")
+    app = ImageGeneratorApp(root, "SDXL Live")
     root.mainloop()
 
 if __name__ == '__main__':
