@@ -5,14 +5,15 @@ import torch
 from diffusers import AutoPipelineForImage2Image
 import numpy as np
 import random
+import threading
+import queue
 
 class ImageGeneratorApp:
     def __init__(self, window, window_title):
         self.window = window
         self.window.title(window_title)
-        self.window.geometry('600x800')  # Adjusted window size to accommodate larger canvas and controls
+        self.window.geometry('600x800')
 
-        # Create a main frame to hold all content
         self.main_frame = ttk.Frame(self.window)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -25,8 +26,11 @@ class ImageGeneratorApp:
         self.setup_ui()
 
         self.recording = False
-        self.previous_frame = None  # To store the previous frame for img2img feedback
+        self.previous_frame = None
         self.frame_count = 0
+
+        self.image_queue = queue.Queue(maxsize=1)
+        self.generation_thread = None
 
         self.load_model()
 
@@ -82,27 +86,26 @@ class ImageGeneratorApp:
         self.pipe.to(device)
 
     def toggle_recording(self):
-        # Toggles between recording and not recording states
         self.recording = not self.recording
         if self.recording:
             print("Generation started...")
-            self.generate_images()
+            self.generation_thread = threading.Thread(target=self.generate_images)
+            self.generation_thread.start()
+            self.check_queue()
         else:
             print("Generation stopped.")
 
     def generate_images(self):
-        if self.recording:
-            self.process_and_display_frame()
-            self.window.after(10, self.generate_images)  # Continue generating images every x ms
+        while self.recording:
+            self.process_frame()
 
-    def process_and_display_frame(self):
+    def process_frame(self):
         prompt = self.text_input.get("1.0", tk.END).strip()
         seed = self.seed_slider.get()
 
         if prompt:
             torch.manual_seed(seed)
 
-            # Create an initial image from the prompt if it's the first frame
             if self.previous_frame is None:
                 init_image = Image.new('RGB', (512, 512), color='white')
                 transformed_image = self.pipe(prompt=prompt,
@@ -112,27 +115,33 @@ class ImageGeneratorApp:
                                               num_inference_steps=self.num_steps_slider.get()).images[0]
                 self.previous_frame = transformed_image
             else:
-                # Apply random perturbations to the previous frame
                 perturbed_image = self.apply_random_perturbations(self.previous_frame)
-
-                # Use the previous frame for the next iteration
                 transformed_image = self.pipe(prompt=prompt,
                                               image=perturbed_image,
                                               strength=self.strength_slider.get(),
                                               guidance_scale=self.guidance_scale_slider.get(),
                                               num_inference_steps=self.num_steps_slider.get()).images[0]
-
-                # Blend the previous and current frames with a reduced effect
                 blended_image = self.blend_images(self.previous_frame, transformed_image, alpha=0.1)
+                self.previous_frame = blended_image
 
-                self.previous_frame = blended_image  # Update the previous frame for the next iteration
+                try:
+                    self.image_queue.put(blended_image, block=False)
+                except queue.Full:
+                    pass  # Skip this frame if the queue is full
 
-                self.display_transformed_image(blended_image)
+            self.frame_count += 1
+            if self.frame_count % 20 == 0:
+                self.window.after(0, lambda: self.seed_slider.set(seed + 1))
 
-                # Increment the seed every few frames
-                self.frame_count += 1
-                if self.frame_count % 20 == 0:  # Change the seed every 20 frames
-                    self.seed_slider.set(seed + 1)
+    def check_queue(self):
+        try:
+            image = self.image_queue.get(block=False)
+            self.display_transformed_image(image)
+        except queue.Empty:
+            pass
+        
+        if self.recording:
+            self.window.after(10, self.check_queue)
 
     def apply_random_perturbations(self, image):
         enhancer = ImageEnhance.Brightness(image)
@@ -150,11 +159,12 @@ class ImageGeneratorApp:
     def display_transformed_image(self, transformed_image):
         photo = ImageTk.PhotoImage(transformed_image)
         self.output_canvas.create_image(0, 0, image=photo, anchor=tk.NW)
-        self.output_canvas.image = photo  # Keep a reference!
+        self.output_canvas.image = photo
 
     def on_closing(self):
-        # Properly closes the application and releases resources
         self.recording = False
+        if self.generation_thread:
+            self.generation_thread.join()
         self.window.destroy()
 
 def main():
